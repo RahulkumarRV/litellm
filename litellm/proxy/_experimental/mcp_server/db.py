@@ -5,10 +5,10 @@ import json
 from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING, Any, Final, Literal, NotRequired, Protocol, TypedDict, cast
+from typing import TYPE_CHECKING, Any, Final, Literal, Protocol, TypedDict, cast
 
 from fastapi import HTTPException
-from pydantic import ConfigDict, TypeAdapter, with_config
+from pydantic import ConfigDict, TypeAdapter
 from typing_extensions import ReadOnly
 
 from litellm._logging import verbose_proxy_logger
@@ -235,15 +235,11 @@ class OAuthCredentialPayload(_OAuthCredentialAccessToken, total=False):
 OAuthGrantState = Literal["valid", "refreshable", "absent"]
 
 
-@with_config(ConfigDict(extra="allow", strict=True))
-class _OAuthTokenRefreshResponse(TypedDict):
-    access_token: NotRequired[ReadOnly[str]]
-    refresh_token: NotRequired[ReadOnly[str]]
-    expires_in: NotRequired[ReadOnly[object]]
-    scope: NotRequired[ReadOnly[object]]
-
-
-_OAUTH_TOKEN_REFRESH_RESPONSE: Final = TypeAdapter(_OAuthTokenRefreshResponse)
+class _OAuthTokenRefreshResponse(TypedDict, total=False):
+    access_token: str
+    refresh_token: str
+    expires_in: int
+    scope: str
 
 
 def _credential_auth_class(auth_type: str | None) -> str | None:
@@ -2111,7 +2107,7 @@ async def refresh_user_oauth_token(
             data=token_data,
         )
         response.raise_for_status()
-        body: Final = _OAUTH_TOKEN_REFRESH_RESPONSE.validate_python(response.json())
+        body: Final[_OAuthTokenRefreshResponse] = response.json()
     except Exception as exc:
         verbose_proxy_logger.warning(
             "refresh_user_oauth_token: refresh request failed for user=%s server=%s: %s",
@@ -2145,11 +2141,10 @@ async def refresh_user_oauth_token(
 
     expires_in: int | None = None
     raw_expires: Final = body.get("expires_in")
-    if isinstance(raw_expires, (str, int, float, bytes, bytearray)):
-        try:
-            expires_in = int(raw_expires)
-        except (TypeError, ValueError):
-            pass
+    try:
+        expires_in = int(raw_expires) if raw_expires is not None else None
+    except (TypeError, ValueError):
+        pass
 
     # Rotate refresh token when the provider returns a new one
     new_refresh_token: Final[str | None] = body.get("refresh_token") or refresh_token
