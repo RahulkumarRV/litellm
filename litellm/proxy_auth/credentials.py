@@ -9,18 +9,6 @@ import time
 from dataclasses import dataclass
 from typing import Final, Protocol, runtime_checkable
 
-from pydantic import ConfigDict, TypeAdapter, with_config
-from typing_extensions import NotRequired, ReadOnly, TypedDict
-
-
-@with_config(ConfigDict(extra="allow", strict=True))
-class _OAuthTokenResponse(TypedDict):
-    access_token: ReadOnly[str]
-    expires_in: ReadOnly[NotRequired[int]]
-
-
-_OAUTH_TOKEN_RESPONSE_ADAPTER: Final = TypeAdapter(_OAuthTokenResponse)
-
 
 @dataclass
 class AccessToken:
@@ -205,7 +193,7 @@ class GenericOAuth2Credential:
             },
         )
         response.raise_for_status()
-        data: Final[_OAuthTokenResponse] = _OAUTH_TOKEN_RESPONSE_ADAPTER.validate_python(response.json())
+        data: Final = response.json()
 
         self._cached_token = AccessToken(
             token=data["access_token"],

@@ -86,19 +86,16 @@ class _CreatedObject(TypedDict):
     id: ReadOnly[str]
 
 
-@with_config(ConfigDict(extra="allow", strict=True))
 class _RunError(TypedDict, total=False):
-    message: ReadOnly[object]
+    message: ReadOnly[str]
 
 
-@with_config(ConfigDict(extra="allow", strict=True))
 class _RunStatus(TypedDict, total=False):
-    status: ReadOnly[object]
+    status: ReadOnly[str]
     last_error: ReadOnly[_RunError]
 
 
 _CREATED_OBJECT_ADAPTER: Final = TypeAdapter(_CreatedObject)
-_RUN_STATUS_ADAPTER: Final = TypeAdapter(_RunStatus)
 
 
 class _SSEDelta(TypedDict, total=False):
@@ -404,14 +401,14 @@ class AzureAIAgentsHandler:
             response = make_request("GET", status_url)
             self._check_response(response, [200], "Failed to get run status")
 
-            status_data: _RunStatus = _RUN_STATUS_ADAPTER.validate_python(response.json())
+            status_data: _RunStatus = response.json()
             status = status_data.get("status")
             verbose_logger.debug("Run status: %s", status)
 
             if status == "completed":
                 break
             elif status in ["failed", "cancelled", "expired"]:
-                error_data: _RunStatus = _RUN_STATUS_ADAPTER.validate_python(response.json())
+                error_data: _RunStatus = response.json()
                 error_msg = error_data.get("last_error", {}).get("message", "Unknown error")
                 raise AzureAIAgentsError(status_code=500, message=f"Run {status}: {error_msg}")
 
@@ -532,14 +529,14 @@ class AzureAIAgentsHandler:
             response = await make_request("GET", status_url)
             self._check_response(response, [200], "Failed to get run status")
 
-            status_data: _RunStatus = _RUN_STATUS_ADAPTER.validate_python(response.json())
+            status_data: _RunStatus = response.json()
             status = status_data.get("status")
             verbose_logger.debug("Run status: %s", status)
 
             if status == "completed":
                 break
             elif status in ["failed", "cancelled", "expired"]:
-                error_data: _RunStatus = _RUN_STATUS_ADAPTER.validate_python(response.json())
+                error_data: _RunStatus = response.json()
                 error_msg = error_data.get("last_error", {}).get("message", "Unknown error")
                 raise AzureAIAgentsError(status_code=500, message=f"Run {status}: {error_msg}")
 
